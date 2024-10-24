@@ -358,6 +358,8 @@ void SyncLiveTensors(const std::string& device_str,
       opt_device ? &opt_device.value() : nullptr, devices, wait);
 }
 
+void Reset() { XLAGraphExecutor::Get()->Reset(); }
+
 void StepMarker(const std::string& device_str,
                 const std::vector<std::string>& devices, bool wait) {
   tsl::profiler::TraceMe activity("StepMarker",
@@ -1436,6 +1438,7 @@ void InitXlaModuleBindings(py::module m) {
           return py::bytes(
               XLAGraphExecutor::Get()->DumpHloComputation(xtensors, mode));
         });
+  m.def("_xla_reset", []() { Reset(); });
   m.def("_run_stablehlo",
         [](const std::string& bytecode,
            const std::vector<at::IValue>& graph_inputs)

@@ -25,6 +25,12 @@ class PerDeviceLoader(object):
     self._mark_step_batch_count = loader.batches_per_execution - 1
     self._batches_yielded = 0
 
+  def __del__(self):
+    try:
+        self.close()
+    except:
+        pass
+
   def __iter__(self):
     return self
 
@@ -50,6 +56,9 @@ class PerDeviceLoader(object):
       xm.mark_step()
       raise StopIteration
     return item
+
+  def close(self):
+    self._loader.close()
 
 
 class ParallelLoader(object):
@@ -112,6 +121,12 @@ class ParallelLoader(object):
         thread.daemon = True
         thread.start()
 
+  def __del__(self):
+    try:
+        self.close()
+    except:
+        pass
+
   def per_device_loader(self, device):
     """Retrieves the loader iterator object for the given device.
 
@@ -138,6 +153,10 @@ class ParallelLoader(object):
     for dqueue in self._queues.values():
       dqueue.queue.close()
       dqueue.loader_queue.close()
+    # Wait for threads to finish
+    for thread in threading.enumerate():
+      if thread != threading.current_thread():
+          thread.join()
 
   @property
   def batches_per_execution(self):
@@ -199,11 +218,26 @@ class MpDeviceLoader(object):
     self._loader = loader
     self._device = device
     self._parallel_loader_kwargs = kwargs
+    self._parallel_loader = None
 
   def __iter__(self):
-    parallel_loader = ParallelLoader(self._loader, [self._device],
-                                     **self._parallel_loader_kwargs)
-    return parallel_loader.per_device_loader(self._device)
+    if self._parallel_loader is not None:
+        self._parallel_loader.close()
+        self._parallel_loader = None
+    self._parallel_loader = ParallelLoader(self._loader, [self._device],
+                                            **self._parallel_loader_kwargs)
+    return self._parallel_loader.per_device_loader(self._device)
 
   def __len__(self):
     return len(self._loader)
+
+  def close(self):
+    if self._parallel_loader is not None:
+        self._parallel_loader.close()
+        self._parallel_loader = None
+
+  def __del__(self):
+    try:
+        self.close()
+    except:
+        pass

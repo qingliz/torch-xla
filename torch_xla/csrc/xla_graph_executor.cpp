@@ -82,6 +82,10 @@ auto XLAGraphExecutor::DeviceContextArena::Get() -> DeviceContextArena* {
   return arena;
 }
 
+void XLAGraphExecutor::Reset() {
+  DeviceContextArena::Get()->ClearLiveTensors();
+}
+
 std::vector<XLATensorPtr> XLAGraphExecutor::DeviceContextArena::GetLiveTensors(
     const torch::lazy::BackendDevice* device) {
   std::vector<XLATensorPtr> tensors;
@@ -97,6 +101,18 @@ std::vector<XLATensorPtr> XLAGraphExecutor::DeviceContextArena::GetLiveTensors(
   };
   ForAllDeviceContexts(fn, device);
   return tensors;
+}
+
+void XLAGraphExecutor::DeviceContextArena::ClearLiveTensors() {
+  auto fn = [&](DeviceContext* devctx) {
+    // std::lock_guard<std::mutex> lock(devctx->lock);
+    for (auto& uid_wptr : devctx->tensors_data) {
+      auto data = uid_wptr.second.lock();
+      UnregisterTensor(data.get());
+      data.reset();
+    }
+  };
+  ForAllDeviceContexts(fn, nullptr);
 }
 
 torch::lazy::Value XLAGraphExecutor::DeviceContextArena::GetRngSeed(

@@ -35,6 +35,8 @@ class XLAGraphExecutor : public torch::lazy::LazyGraphExecutor {
  public:
   static XLAGraphExecutor* Get();
 
+  void Reset();
+
   // Override to use our own DeviceContextArena.
   void RegisterTensor(
       std::shared_ptr<torch::lazy::LazyTensor::Data> data) final;
@@ -211,6 +213,7 @@ class XLAGraphExecutor : public torch::lazy::LazyGraphExecutor {
     // This method returns XLATensorPtrs instead of LazyTensorPtrs.
     std::vector<XLATensorPtr> GetLiveTensors(
         const torch::lazy::BackendDevice* device);
+    void ClearLiveTensors();
 
     // We override this to use our own + and * for torch::lazy::Value.
     torch::lazy::Value GetRngSeed(
